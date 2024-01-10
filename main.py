@@ -7,11 +7,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 app=FastAPI(debug=True)
 
-
-
 df = pd.read_csv('databases/all_data.csv')
 
-@app.get('/TopYearPlaytimeGenre/')
+#------------------------------------------#
+
+@app.get('/TopYearPlaytimeGenre/') #Function to get the year with the more hours played for any given genre
 def TopYearPlaytimeGenre(genre: str) -> dict:
     genre = genre.capitalize()
     genre_df = df[df[genre] == 1]
@@ -23,8 +23,6 @@ def TopYearPlaytimeGenre(genre: str) -> dict:
 #-------------------------------------------------------------------------------#
 
 #Get the user with more hours in a given genre, then a list of ther hours through the years
-
-
 @app.get('/TopUserForGenre/')
 def TopUserForGenre(genre: str) -> dict:
     genre = genre.capitalize()
@@ -38,14 +36,15 @@ def TopUserForGenre(genre: str) -> dict:
     return result
 
 #-----------------------------------------------------------#
-
+#Gives the most recommended games for each year based on how many good reviews they have
 @app.get('/UsersRecommend/')
 def UsersRecommend(year: int) -> dict:
+    #Filter with a combination of the column "recommend" and "sentiment_score" to asure that the review was positive
     df_filtrado = df[(df['release_year'] == year) & (df['recommend'] == True) & (df['sentiment_score'] == 2)]
     if df_filtrado.empty:
         return {"error": 'Valor no encontrado'}
     df_ordenado = df_filtrado.sort_values(by='sentiment_score', ascending=False)
-    top_3_reseñas = df_ordenado["title"].value_counts()
+    top_3_reseñas = df_ordenado["title"].value_counts() #Then the ones with more positive reviews are returned
     
     resultado = {
         "Puesto 1": top_3_reseñas.index[0],
@@ -56,16 +55,17 @@ def UsersRecommend(year: int) -> dict:
 
 
 #--------------------------------------------------------------#
+#Gives the least recommended games for each year based on how many bad reviews they have
 
 @app.get('/UsersNotRecommed/')
-
 def UsersNotRecommend(year: int) -> dict:
+     #Filter with a combination of the column "recommend" and "sentiment_score" to asure that the review was negative
     df_filtrado = df[(df['release_year'] == year) & (df['recommend'] == False) & (df['sentiment_score'] == 0)]
     if df_filtrado.empty:
         return {"error": 'Valor no encontrado'}
     df_ordenado = df_filtrado.sort_values(by='sentiment_score', ascending=False)
     top_3_reseñas = df_ordenado["title"].value_counts()
-    
+    #Then the ones with more negative reviews are returned
     resultado = {
         "Puesto 1": top_3_reseñas.index[0],
         "Puesto 2": top_3_reseñas.index[1],
@@ -74,6 +74,8 @@ def UsersNotRecommend(year: int) -> dict:
     return resultado
 
 #------------------------------------------------------------------#
+#Returns how the whole of the dataset was percieved on a given year
+#using the sentiment analysis made from the written reviews
 
 @app.get('/sentiment_analysis/')
 def sentiment_analysis(year: int) -> dict:
@@ -88,15 +90,15 @@ def sentiment_analysis(year: int) -> dict:
 
 
 #--------------------------------------------------------------------#
-#Model to recomend games based on similar games
+#Model to recomend games based on similar games, based on genre similarity
 
-
-sample = df.drop_duplicates(subset=["item_id"])
-tfidf = TfidfVectorizer(stop_words='english', ngram_range=(2,2))
+sample = df.drop_duplicates(subset=["item_id"]) #Droping duplicated titles given that only one instance of each game is needed
+tfidf = TfidfVectorizer(stop_words='english', ngram_range=(2,2)) #vectorizing to proces in a model
 sample=sample.fillna("")
 
 tdfid_matrix = tfidf.fit_transform(sample['genres'])
-cosine_similarity = linear_kernel( tdfid_matrix, tdfid_matrix)
+#Trainign a model of cosine similarity with the data from the genres
+cosine_similarity = linear_kernel( tdfid_matrix, tdfid_matrix) 
 
 @app.get('/game_to_games_recomendation')
 def recomendation(id_game: int):
